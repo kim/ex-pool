@@ -13,7 +13,9 @@ version, for when the following properties seem useful:
     handling.
 
   * Also, a number of yet-to-be-released enhancements and fixes to the original
-    library are included (namely bos/pool#11, bos/pool#15, bos/pool#16).
+    library are included (namely [#11](https://github.com/bos/pool/pull/11),
+    [#15](https://github.com/bos/pool/pull/15),
+    [#16](https://github.com/bos/pool/pull/16)).
 
 That is, if you don't need any of the above, use the original package :)
 
