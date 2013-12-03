@@ -1,5 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- |
 -- Module:      Data.Pool
@@ -34,7 +33,8 @@ import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Monad
-import           Control.Monad.Catch
+import           Control.Monad.Catch    (MonadCatch)
+import qualified Control.Monad.Catch    as E
 import           Control.Monad.IO.Class
 import           Data.Hashable          (hash)
 import           Data.IORef             (IORef, mkWeakIORef, newIORef)
@@ -110,9 +110,9 @@ purgePool p = V.forM_ (localPools p) $ purgeLocalPool (destroy p)
 
 withResource :: (MonadIO m, MonadCatch m) => Pool a -> (a -> m b) -> m b
 {-# SPECIALIZE withResource :: Pool a -> (a -> IO b) -> IO b #-}
-withResource p act = mask $ \ restore -> do
+withResource p act = E.mask $ \ restore -> do
     (r, lp) <- takeResource p
-    res <- restore (act r) `onException` destroyResource p lp r
+    res <- restore (act r) `E.onException` destroyResource p lp r
     putResource lp r
     return res
 {-# INLINABLE withResource #-}
@@ -125,11 +125,11 @@ withResource p act = mask $ \ restore -> do
 tryWithResource :: (MonadIO m, MonadCatch m)
                 => Pool a -> (a -> m b) -> m (Maybe b)
 {-# SPECIALIZE tryWithResource :: Pool a -> (a -> IO b) -> IO (Maybe b) #-}
-tryWithResource p act = mask $ \ restore -> do
+tryWithResource p act = E.mask $ \ restore -> do
     mres <- tryTakeResource p
     case mres of
         Just (r, lp) -> do
-            res <- restore (act r) `onException` destroyResource p lp r
+            res <- restore (act r) `E.onException` destroyResource p lp r
             putResource lp r
             return (Just res)
         Nothing -> restore $ return Nothing
@@ -150,7 +150,7 @@ takeResource p = do
                 when (used == maxResources p) retry
                 writeTVar (inUse lp) $! used + 1
                 return $ liftIO (create p)
-                    `onException` modify_ (inUse lp) (subtract 1)
+                    `E.onException` modify_ (inUse lp) (subtract 1)
     return (r, lp)
 {-# INLINABLE takeResource #-}
 
@@ -175,7 +175,7 @@ tryTakeResource p = do
                       writeTVar (inUse lp) $! used + 1
                       return $ Just
                             <$> liftIO (create p)
-                                `onException` modify_ (inUse lp) (subtract 1)
+                                `E.onException` modify_ (inUse lp) (subtract 1)
     return $ flip (,) lp <$> r
 {-# INLINABLE tryTakeResource #-}
 
@@ -189,7 +189,7 @@ putResource lp r = liftIO $ do
 destroyResource :: MonadIO m => Pool a -> LocalPool a -> a -> m ()
 {-# SPECIALIZE destroyResource :: Pool a -> LocalPool a -> a -> IO () #-}
 destroyResource p lp r = liftIO $ do
-    destroy p r `catch` \(_::SomeException) -> return ()
+    ignoreExceptions $ destroy p r
     modify_ (inUse lp) (subtract 1)
 {-# INLINABLE destroyResource #-}
 
@@ -209,8 +209,7 @@ reaper destroy idleTime pools = forever $ do
                 writeTVar resources fresh
                 modifyTVar' inUse $ subtract (fromIntegral (length stale))
             return (map resource stale)
-        forM_ rs $ \ r ->
-            liftIO (destroy r) `catch` \(_::SomeException) -> return ()
+        forM_ rs $ liftIO . ignoreExceptions . destroy
 
 purgeLocalPool :: (a -> IO ()) -> LocalPool a -> IO ()
 purgeLocalPool destroy (LocalPool inUse resources _) = do
@@ -219,8 +218,7 @@ purgeLocalPool destroy (LocalPool inUse resources _) = do
         modifyTVar' inUse     $ subtract (fromIntegral (length rs))
         modifyTVar' resources $ const []
         return rs
-    forM_ rs $ \ r ->
-        liftIO (destroy (resource r)) `catch` \(_::SomeException) -> return ()
+    forM_ rs $ liftIO . ignoreExceptions . destroy . resource
 {-# INLINABLE purgeLocalPool #-}
 
 getLocalPool :: MonadIO m => Pool a -> m (LocalPool a)
@@ -233,3 +231,7 @@ getLocalPool p = do
 modify_ :: TVar a -> (a -> a) -> IO ()
 modify_ t f = atomically $ modifyTVar' t f
 {-# INLINABLE modify_ #-}
+
+ignoreExceptions :: IO () -> IO ()
+ignoreExceptions = E.handleAll (const $ return ())
+{-# INLINABLE ignoreExceptions #-}

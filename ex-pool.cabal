@@ -1,5 +1,5 @@
 name:                ex-pool
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:
   Another fork of resource-pool, with a MonadIO and MonadCatch constraint
 
@@ -36,7 +36,7 @@ library
     , transformers
     , vector
 
-  ghc-options:       -Wall
+  ghc-options:       -Wall -funbox-strict-fields
 
   default-language:  Haskell2010
 
