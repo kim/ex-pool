@@ -33,7 +33,7 @@ import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Monad
-import           Control.Monad.Catch    (MonadCatch)
+import           Control.Monad.Catch    (MonadMask)
 import qualified Control.Monad.Catch    as E
 import           Control.Monad.IO.Class
 import           Data.Hashable          (hash)
@@ -108,7 +108,7 @@ createPool create destroy nStripes idleTime maxResources = do
 purgePool :: Pool a -> IO ()
 purgePool p = V.forM_ (localPools p) $ purgeLocalPool (destroy p)
 
-withResource :: (MonadIO m, MonadCatch m) => Pool a -> (a -> m b) -> m b
+withResource :: (MonadIO m, MonadMask m) => Pool a -> (a -> m b) -> m b
 {-# SPECIALIZE withResource :: Pool a -> (a -> IO b) -> IO b #-}
 withResource p act = E.mask $ \ restore -> do
     (r, lp) <- takeResource p
@@ -122,7 +122,7 @@ withResource p act = E.mask $ \ restore -> do
 -- returns immediately with 'Nothing' (ie. the action function is /not/ called).
 -- Conversely, if a resource can be borrowed from the pool without blocking, the
 -- action is performed and it's result is returned, wrapped in a 'Just'.
-tryWithResource :: (MonadIO m, MonadCatch m)
+tryWithResource :: (MonadIO m, MonadMask m)
                 => Pool a -> (a -> m b) -> m (Maybe b)
 {-# SPECIALIZE tryWithResource :: Pool a -> (a -> IO b) -> IO (Maybe b) #-}
 tryWithResource p act = E.mask $ \ restore -> do
