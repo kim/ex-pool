@@ -1,5 +1,5 @@
 name:                ex-pool
-version:             0.1.0.3
+version:             0.2
 synopsis:
   Another fork of resource-pool, with a MonadIO and MonadCatch constraint
 
@@ -29,7 +29,7 @@ library
   exposed-modules:   Data.Pool
   build-depends:
       base           == 4.*
-    , exceptions     <  0.6
+    , exceptions     == 0.6.*
     , hashable
     , stm
     , time
