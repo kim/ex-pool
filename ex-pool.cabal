@@ -1,5 +1,5 @@
 name:                ex-pool
-version:             0.2
+version:             0.2.1
 synopsis:
   Another fork of resource-pool, with a MonadIO and MonadCatch constraint
 
